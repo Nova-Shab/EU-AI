@@ -1,0 +1,17 @@
+{
+  "name": "eu-ai-act-compliance-frontend",
+  "version": "1.0.0",
+  "description": "Frontend für EU AI Act Compliance Checker",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "eu-ai-act",
+    "compliance",
+    "frontend"
+  ],
+  "author": "",
+  "license": "MIT"
+}
