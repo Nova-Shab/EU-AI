@@ -1,0 +1,1158 @@
+{
+  "name": "EU AI Act Compliance Checker",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "auth/register",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-register",
+      "name": "Webhook - Register",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "eu-ai-register"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "auth/login",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-login",
+      "name": "Webhook - Login",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 500],
+      "webhookId": "eu-ai-login"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "analyze",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-analyze",
+      "name": "Webhook - Analyze AI System",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 700],
+      "webhookId": "eu-ai-analyze"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "status/={{ $parameter.sessionId }}",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-status",
+      "name": "Webhook - Check Status",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 1500],
+      "webhookId": "eu-ai-status"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "download/={{ $parameter.reportId }}",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-download",
+      "name": "Webhook - Download Report",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 1700],
+      "webhookId": "eu-ai-download"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "email",
+              "value": "={{ $json.body.email }}"
+            },
+            {
+              "name": "password",
+              "value": "={{ $json.body.password }}"
+            },
+            {
+              "name": "fullName",
+              "value": "={{ $json.body.fullName }}"
+            },
+            {
+              "name": "company",
+              "value": "={{ $json.body.company }}"
+            },
+            {
+              "name": "userId",
+              "value": "={{ $now.format('x') }}-{{ $json.body.email.hash('md5').substring(0, 8) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-register-data",
+      "name": "Extract Registration Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Hash password (in production, use bcrypt or similar)\nconst crypto = require('crypto');\n\nfor (const item of $input.all()) {\n  const password = item.json.password;\n  const hash = crypto.createHash('sha256').update(password).digest('hex');\n  \n  item.json.passwordHash = hash;\n  delete item.json.password;\n}\n\nreturn $input.all();"
+      },
+      "id": "hash-password-register",
+      "name": "Hash Password",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "users",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "userId",
+              "fieldValue": "={{ $json.userId }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $json.email }}"
+            },
+            {
+              "fieldId": "passwordHash",
+              "fieldValue": "={{ $json.passwordHash }}"
+            },
+            {
+              "fieldId": "fullName",
+              "fieldValue": "={{ $json.fullName }}"
+            },
+            {
+              "fieldId": "company",
+              "fieldValue": "={{ $json.company }}"
+            },
+            {
+              "fieldId": "createdAt",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "id": "store-user",
+      "name": "Store User in Database",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [1000, 300],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "1",
+          "name": "Airtable Account"
+        }
+      },
+      "notes": "Alternative: Use PostgreSQL, MySQL, or any other database"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "token",
+              "value": "={{ $json.userId }}.{{ $now.format('x') }}.{{ ($json.userId + $now.format('x')).hash('md5') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "generate-auth-token",
+      "name": "Generate Auth Token",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": true,\n  \"message\": \"Registration successful\",\n  \"userId\": $json.userId,\n  \"token\": $json.token\n} }}"
+      },
+      "id": "response-register-success",
+      "name": "Response - Registration Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1500, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "email",
+              "value": "={{ $json.body.email }}"
+            },
+            {
+              "name": "password",
+              "value": "={{ $json.body.password }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-login-data",
+      "name": "Extract Login Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [500, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Hash password for comparison\nconst crypto = require('crypto');\n\nfor (const item of $input.all()) {\n  const password = item.json.password;\n  const hash = crypto.createHash('sha256').update(password).digest('hex');\n  \n  item.json.passwordHash = hash;\n  delete item.json.password;\n}\n\nreturn $input.all();"
+      },
+      "id": "hash-password-login",
+      "name": "Hash Password for Login",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 500]
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "tableId": "users",
+        "returnAll": false,
+        "limit": 1,
+        "filterByFormula": "={email} = '{{ $json.email }}'",
+        "options": {}
+      },
+      "id": "find-user",
+      "name": "Find User in Database",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [1000, 500],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "1",
+          "name": "Airtable Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.fields?.passwordHash }}",
+              "operation": "equals",
+              "value2": "={{ $('Hash Password for Login').item.json.passwordHash }}"
+            }
+          ]
+        }
+      },
+      "id": "check-password",
+      "name": "Verify Password",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1250, 500]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "token",
+              "value": "={{ $json.fields.userId }}.{{ $now.format('x') }}.{{ ($json.fields.userId + $now.format('x')).hash('md5') }}"
+            },
+            {
+              "name": "userId",
+              "value": "={{ $json.fields.userId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "generate-login-token",
+      "name": "Generate Login Token",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [1500, 450]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": true,\n  \"message\": \"Login successful\",\n  \"userId\": $json.userId,\n  \"token\": $json.token\n} }}"
+      },
+      "id": "response-login-success",
+      "name": "Response - Login Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1750, 450]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": false,\n  \"message\": \"Invalid email or password\"\n} }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "response-login-failed",
+      "name": "Response - Login Failed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1500, 550]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "authToken",
+              "value": "={{ $json.headers.authorization?.replace('Bearer ', '') }}"
+            },
+            {
+              "name": "inputType",
+              "value": "={{ $json.body.inputType }}"
+            },
+            {
+              "name": "url",
+              "value": "={{ $json.body.url }}"
+            },
+            {
+              "name": "description",
+              "value": "={{ $json.body.description }}"
+            },
+            {
+              "name": "sessionId",
+              "value": "={{ $now.format('x') }}-{{ $json.headers.authorization?.hash('md5').substring(0, 8) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-analyze-data",
+      "name": "Extract Analysis Request",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [500, 700]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate authentication token\nconst items = $input.all();\n\nfor (const item of items) {\n  const token = item.json.authToken;\n  \n  if (!token || token === 'undefined') {\n    item.json.authenticated = false;\n    item.json.error = 'No authentication token provided';\n  } else {\n    // In production, verify token against database\n    item.json.authenticated = true;\n    item.json.userId = token.split('.')[0];\n  }\n}\n\nreturn items;"
+      },
+      "id": "validate-auth",
+      "name": "Validate Authentication",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 700]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.authenticated }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-auth",
+      "name": "Check Authentication",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1000, 700]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": false,\n  \"message\": \"Authentication required\"\n} }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "response-auth-failed",
+      "name": "Response - Auth Failed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 800]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.inputType }}",
+              "operation": "equals",
+              "value2": "url"
+            }
+          ]
+        }
+      },
+      "id": "check-input-type",
+      "name": "Check Input Type",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1250, 650]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "fetch-website",
+      "name": "Fetch Website Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1500, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract text content from HTML\nconst items = $input.all();\n\nfor (const item of items) {\n  const html = item.json.data || item.json.body || '';\n  \n  // Simple HTML to text conversion (in production, use a proper library)\n  let text = html\n    .replace(/<script[^>]*>.*?<\\/script>/gis, '')\n    .replace(/<style[^>]*>.*?<\\/style>/gis, '')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n  \n  // Limit to first 10000 characters to avoid token limits\n  text = text.substring(0, 10000);\n  \n  item.json.extractedContent = text;\n}\n\nreturn items;"
+      },
+      "id": "extract-content",
+      "name": "Extract Website Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1750, 600]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "extractedContent",
+              "value": "={{ $json.description }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "use-description",
+      "name": "Use Description",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [1500, 750]
+    },
+    {
+      "parameters": {},
+      "id": "merge-content",
+      "name": "Merge Content Sources",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [2000, 700]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "analysis-request",
+              "name": "analysisPrompt",
+              "value": "=You are an EU AI Act compliance expert. Analyze the following AI system and provide a comprehensive compliance assessment.\n\n## AI System Information:\n{{ $json.extractedContent }}\n\n## Your Task:\nAnalyze this AI system against the EU AI Act requirements and provide:\n\n1. **Risk Classification**: Determine if this is:\n   - Unacceptable Risk (prohibited)\n   - High Risk\n   - Limited Risk\n   - Minimal Risk\n\n2. **Compliance Analysis**: Identify all non-conformities with EU AI Act requirements\n\n3. **Recommended Actions**: Provide specific, actionable measures to address each deviation\n\nProvide your response in the following JSON format:\n```json\n{\n  \"riskClassification\": {\n    \"level\": \"High Risk|Limited Risk|Minimal Risk|Unacceptable Risk\",\n    \"reasoning\": \"Detailed explanation\",\n    \"articleReferences\": [\"Article X\", \"Article Y\"]\n  },\n  \"nonConformities\": [\n    {\n      \"id\": \"NC-001\",\n      \"title\": \"Brief title\",\n      \"description\": \"Detailed description\",\n      \"severity\": \"Critical|High|Medium|Low\",\n      \"articleReference\": \"Article X, Section Y\",\n      \"requirement\": \"Specific requirement not met\"\n    }\n  ],\n  \"recommendedMeasures\": [\n    {\n      \"nonConformityId\": \"NC-001\",\n      \"measure\": \"Specific action to take\",\n      \"priority\": \"Critical|High|Medium|Low\",\n      \"estimatedEffort\": \"Description of effort required\",\n      \"timeline\": \"Suggested timeline\"\n    }\n  ],\n  \"summary\": \"Executive summary of findings\"\n}\n```",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "prepare-ai-prompt",
+      "name": "Prepare AI Analysis Prompt",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2250, 700]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4-turbo-preview",
+        "messages": {
+          "messageValues": [
+            {
+              "role": "user",
+              "message": "={{ $json.analysisPrompt }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.3,
+          "maxTokens": 4000
+        },
+        "requestOptions": {}
+      },
+      "id": "analyze-with-ai",
+      "name": "Analyze with OpenAI",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.3,
+      "position": [2500, 700],
+      "credentials": {
+        "openAiApi": {
+          "id": "2",
+          "name": "OpenAI Account"
+        }
+      },
+      "notes": "Alternative: Use Claude API, local LLM, or other AI service"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI response and structure the data\nconst items = $input.all();\n\nfor (const item of items) {\n  const response = item.json.message?.content || item.json.choices?.[0]?.message?.content || '';\n  \n  try {\n    // Extract JSON from response (handle markdown code blocks)\n    const jsonMatch = response.match(/```json\\s*([\\s\\S]*?)\\s*```/) || response.match(/\\{[\\s\\S]*\\}/);\n    \n    if (jsonMatch) {\n      const jsonStr = jsonMatch[1] || jsonMatch[0];\n      const analysisResult = JSON.parse(jsonStr);\n      \n      item.json.analysisResult = analysisResult;\n      item.json.parseSuccess = true;\n    } else {\n      item.json.parseSuccess = false;\n      item.json.rawResponse = response;\n    }\n  } catch (error) {\n    item.json.parseSuccess = false;\n    item.json.error = error.message;\n    item.json.rawResponse = response;\n  }\n  \n  // Get session data from earlier in the workflow\n  item.json.sessionId = $('Extract Analysis Request').item.json.sessionId;\n  item.json.userId = $('Validate Authentication').item.json.userId;\n}\n\nreturn items;"
+      },
+      "id": "parse-ai-response",
+      "name": "Parse AI Analysis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2750, 700]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate HTML for PDF report\nconst items = $input.all();\n\nfor (const item of items) {\n  const analysis = item.json.analysisResult;\n  const sessionId = item.json.sessionId;\n  \n  const html = `\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\">\n  <style>\n    body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }\n    h1 { color: #003366; border-bottom: 3px solid #0066cc; padding-bottom: 10px; }\n    h2 { color: #0066cc; margin-top: 30px; }\n    h3 { color: #333; }\n    .header { text-align: center; margin-bottom: 40px; }\n    .risk-badge { display: inline-block; padding: 10px 20px; border-radius: 5px; font-weight: bold; }\n    .risk-high { background-color: #ff4444; color: white; }\n    .risk-limited { background-color: #ffaa00; color: white; }\n    .risk-minimal { background-color: #44aa44; color: white; }\n    .risk-unacceptable { background-color: #cc0000; color: white; }\n    .non-conformity { border-left: 4px solid #ff4444; padding-left: 15px; margin: 20px 0; background: #fff5f5; padding: 15px; }\n    .measure { border-left: 4px solid #0066cc; padding-left: 15px; margin: 20px 0; background: #f0f8ff; padding: 15px; }\n    .severity-critical { color: #cc0000; font-weight: bold; }\n    .severity-high { color: #ff4444; font-weight: bold; }\n    .severity-medium { color: #ffaa00; font-weight: bold; }\n    .severity-low { color: #44aa44; font-weight: bold; }\n    .footer { margin-top: 50px; text-align: center; color: #666; font-size: 0.9em; border-top: 1px solid #ccc; padding-top: 20px; }\n    table { width: 100%; border-collapse: collapse; margin: 20px 0; }\n    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }\n    th { background-color: #003366; color: white; }\n  </style>\n</head>\n<body>\n  <div class=\"header\">\n    <h1>EU AI Act Compliance Report</h1>\n    <p><strong>Report ID:</strong> ${sessionId}</p>\n    <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>\n  </div>\n\n  <h2>Risk Classification</h2>\n  <p>\n    <span class=\"risk-badge risk-${analysis.riskClassification.level.toLowerCase().replace(' ', '-')}\">\n      ${analysis.riskClassification.level}\n    </span>\n  </p>\n  <p><strong>Reasoning:</strong> ${analysis.riskClassification.reasoning}</p>\n  <p><strong>Article References:</strong> ${analysis.riskClassification.articleReferences.join(', ')}</p>\n\n  <h2>Executive Summary</h2>\n  <p>${analysis.summary}</p>\n\n  <h2>Non-Conformities Detected</h2>\n  <p>Total non-conformities found: <strong>${analysis.nonConformities.length}</strong></p>\n  \n  ${analysis.nonConformities.map(nc => `\n    <div class=\"non-conformity\">\n      <h3>${nc.id}: ${nc.title}</h3>\n      <p><strong>Severity:</strong> <span class=\"severity-${nc.severity.toLowerCase()}\">${nc.severity}</span></p>\n      <p><strong>Article Reference:</strong> ${nc.articleReference}</p>\n      <p><strong>Requirement:</strong> ${nc.requirement}</p>\n      <p><strong>Description:</strong> ${nc.description}</p>\n    </div>\n  `).join('')}\n\n  <h2>Recommended Measures</h2>\n  <p>Action plan with ${analysis.recommendedMeasures.length} recommended measures:</p>\n  \n  ${analysis.recommendedMeasures.map((measure, index) => `\n    <div class=\"measure\">\n      <h3>Measure ${index + 1} (for ${measure.nonConformityId})</h3>\n      <p><strong>Priority:</strong> <span class=\"severity-${measure.priority.toLowerCase()}\">${measure.priority}</span></p>\n      <p><strong>Action:</strong> ${measure.measure}</p>\n      <p><strong>Estimated Effort:</strong> ${measure.estimatedEffort}</p>\n      <p><strong>Timeline:</strong> ${measure.timeline}</p>\n    </div>\n  `).join('')}\n\n  <div class=\"footer\">\n    <p>This report was generated automatically by the EU AI Act Compliance Checker.</p>\n    <p>For questions or support, please contact your compliance team.</p>\n    <p><em>This report is for informational purposes only and does not constitute legal advice.</em></p>\n  </div>\n</body>\n</html>\n  `;\n  \n  item.json.reportHtml = html;\n}\n\nreturn items;"
+      },
+      "id": "generate-html-report",
+      "name": "Generate HTML Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3000, 700]
+    },
+    {
+      "parameters": {
+        "url": "https://api.html2pdf.app/v1/generate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "html2PdfApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "html",
+              "value": "={{ $json.reportHtml }}"
+            },
+            {
+              "name": "format",
+              "value": "A4"
+            },
+            {
+              "name": "printBackground",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "convert-to-pdf",
+      "name": "Convert to PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3250, 700],
+      "notes": "Alternative: Use Puppeteer, wkhtmltopdf, or other PDF generation service"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "reports",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "reportId",
+              "fieldValue": "={{ $('Parse AI Analysis').item.json.sessionId }}"
+            },
+            {
+              "fieldId": "userId",
+              "fieldValue": "={{ $('Parse AI Analysis').item.json.userId }}"
+            },
+            {
+              "fieldId": "riskLevel",
+              "fieldValue": "={{ $('Parse AI Analysis').item.json.analysisResult.riskClassification.level }}"
+            },
+            {
+              "fieldId": "nonConformitiesCount",
+              "fieldValue": "={{ $('Parse AI Analysis').item.json.analysisResult.nonConformities.length }}"
+            },
+            {
+              "fieldId": "pdfUrl",
+              "fieldValue": "={{ $json.data }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "completed"
+            },
+            {
+              "fieldId": "createdAt",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "id": "store-report",
+      "name": "Store Report Metadata",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [3500, 700],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "1",
+          "name": "Airtable Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": true,\n  \"message\": \"Analysis completed successfully\",\n  \"sessionId\": $('Parse AI Analysis').item.json.sessionId,\n  \"reportId\": $('Parse AI Analysis').item.json.sessionId,\n  \"riskLevel\": $('Parse AI Analysis').item.json.analysisResult.riskClassification.level,\n  \"nonConformitiesCount\": $('Parse AI Analysis').item.json.analysisResult.nonConformities.length,\n  \"downloadUrl\": \"/api/download/\" + $('Parse AI Analysis').item.json.sessionId\n} }}"
+      },
+      "id": "response-analysis-complete",
+      "name": "Response - Analysis Complete",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [3750, 700]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "reportId",
+              "value": "={{ $json.params.reportId || $json.query.reportId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-report-id",
+      "name": "Extract Report ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [500, 1700]
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "tableId": "reports",
+        "returnAll": false,
+        "limit": 1,
+        "filterByFormula": "={reportId} = '{{ $json.reportId }}'",
+        "options": {}
+      },
+      "id": "fetch-report",
+      "name": "Fetch Report",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [750, 1700],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "1",
+          "name": "Airtable Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.fields.pdfUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "download-pdf",
+      "name": "Download PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 1700]
+    },
+    {
+      "parameters": {
+        "respondWith": "binary",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/pdf"
+              },
+              {
+                "name": "Content-Disposition",
+                "value": "attachment; filename=\"eu-ai-act-report.pdf\""
+              }
+            ]
+          }
+        }
+      },
+      "id": "response-pdf",
+      "name": "Response - PDF Download",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 1700]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "sessionId",
+              "value": "={{ $json.params.sessionId || $json.query.sessionId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-session-id",
+      "name": "Extract Session ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [500, 1500]
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "tableId": "reports",
+        "returnAll": false,
+        "limit": 1,
+        "filterByFormula": "={reportId} = '{{ $json.sessionId }}'",
+        "options": {}
+      },
+      "id": "fetch-status",
+      "name": "Fetch Analysis Status",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [750, 1500],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "1",
+          "name": "Airtable Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": true,\n  \"sessionId\": $('Extract Session ID').item.json.sessionId,\n  \"status\": $json.fields?.status || \"processing\",\n  \"riskLevel\": $json.fields?.riskLevel,\n  \"nonConformitiesCount\": $json.fields?.nonConformitiesCount,\n  \"reportReady\": $json.fields?.status === \"completed\"\n} }}"
+      },
+      "id": "response-status",
+      "name": "Response - Status",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1000, 1500]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Register": {
+      "main": [
+        [
+          {
+            "node": "Extract Registration Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Registration Data": {
+      "main": [
+        [
+          {
+            "node": "Hash Password",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hash Password": {
+      "main": [
+        [
+          {
+            "node": "Store User in Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store User in Database": {
+      "main": [
+        [
+          {
+            "node": "Generate Auth Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Auth Token": {
+      "main": [
+        [
+          {
+            "node": "Response - Registration Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Login": {
+      "main": [
+        [
+          {
+            "node": "Extract Login Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Login Data": {
+      "main": [
+        [
+          {
+            "node": "Hash Password for Login",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hash Password for Login": {
+      "main": [
+        [
+          {
+            "node": "Find User in Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find User in Database": {
+      "main": [
+        [
+          {
+            "node": "Verify Password",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Password": {
+      "main": [
+        [
+          {
+            "node": "Generate Login Token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Response - Login Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Login Token": {
+      "main": [
+        [
+          {
+            "node": "Response - Login Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Analyze AI System": {
+      "main": [
+        [
+          {
+            "node": "Extract Analysis Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Analysis Request": {
+      "main": [
+        [
+          {
+            "node": "Validate Authentication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Authentication": {
+      "main": [
+        [
+          {
+            "node": "Check Authentication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Authentication": {
+      "main": [
+        [
+          {
+            "node": "Check Input Type",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Response - Auth Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Input Type": {
+      "main": [
+        [
+          {
+            "node": "Fetch Website Content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Use Description",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Website Content": {
+      "main": [
+        [
+          {
+            "node": "Extract Website Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Website Content": {
+      "main": [
+        [
+          {
+            "node": "Merge Content Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Description": {
+      "main": [
+        [
+          {
+            "node": "Merge Content Sources",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Content Sources": {
+      "main": [
+        [
+          {
+            "node": "Prepare AI Analysis Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare AI Analysis Prompt": {
+      "main": [
+        [
+          {
+            "node": "Analyze with OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze with OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Analysis": {
+      "main": [
+        [
+          {
+            "node": "Generate HTML Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate HTML Report": {
+      "main": [
+        [
+          {
+            "node": "Convert to PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to PDF": {
+      "main": [
+        [
+          {
+            "node": "Store Report Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Report Metadata": {
+      "main": [
+        [
+          {
+            "node": "Response - Analysis Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Download Report": {
+      "main": [
+        [
+          {
+            "node": "Extract Report ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Report ID": {
+      "main": [
+        [
+          {
+            "node": "Fetch Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Report": {
+      "main": [
+        [
+          {
+            "node": "Download PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download PDF": {
+      "main": [
+        [
+          {
+            "node": "Response - PDF Download",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Check Status": {
+      "main": [
+        [
+          {
+            "node": "Extract Session ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Session ID": {
+      "main": [
+        [
+          {
+            "node": "Fetch Analysis Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Analysis Status": {
+      "main": [
+        [
+          {
+            "node": "Response - Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "id": "eu-ai-act-compliance-checker",
+  "meta": {
+    "instanceId": "n8n-eu-ai-act"
+  },
+  "tags": []
+}
